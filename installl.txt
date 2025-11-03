@@ -1,0 +1,3 @@
+pip install selenium requests schedule pathlib webdriver-manager
+
+winget install ffmpeg
