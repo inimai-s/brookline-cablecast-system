@@ -22,7 +22,7 @@ except ImportError:
 class SimpleBrooklineDownloader:
     def __init__(self):
         self.base_url = "https://www.brooklinema.gov/"
-        self.save_path = Path("C:/govideosav")
+        self.save_path = Path.home() / "govideosav"
         self.driver = None
         self.downloading_tabs = []  # Track tabs with downloads
         self.downloaded_events = set()  # Track downloaded event IDs
@@ -58,16 +58,19 @@ class SimpleBrooklineDownloader:
     def check_and_find_ffmpeg(self):
         """Find FFmpeg executable and test it"""
         print("🔍 Checking FFmpeg availability...")
-        
+
         # Try different ways to find ffmpeg
         possible_paths = [
+            shutil.which("ffmpeg"),  # Use shutil.which first (best cross-platform method)
             "ffmpeg",  # In PATH
-            "ffmpeg.exe",  # In PATH with .exe
-            shutil.which("ffmpeg"),  # Use shutil.which
-            "C:\\ffmpeg\\bin\\ffmpeg.exe",  # Common installation path
+            "/opt/homebrew/bin/ffmpeg",  # Apple Silicon Homebrew (macOS)
+            "/usr/local/bin/ffmpeg",  # Intel Homebrew (macOS)
+            "/usr/bin/ffmpeg",  # Linux system path
+            "ffmpeg.exe",  # Windows PATH with .exe
+            "C:\\ffmpeg\\bin\\ffmpeg.exe",  # Windows common installation path
         ]
-        
-        # Add winget installation paths
+
+        # Add Windows winget installation paths
         import getpass
         username = getpass.getuser()
         winget_paths = [
@@ -75,15 +78,15 @@ class SimpleBrooklineDownloader:
             f"C:\\Users\\{username}\\AppData\\Local\\Microsoft\\WinGet\\Links\\ffmpeg.exe"
         ]
         possible_paths.extend(winget_paths)
-        
+
         for path in possible_paths:
             if path is None:
                 continue
-                
+
             try:
-                # Test the ffmpeg path
-                result = subprocess.run([path, '-version'], 
-                                      capture_output=True, text=True, timeout=10, shell=True)
+                # Test the ffmpeg path (don't use shell=True for better security and compatibility)
+                result = subprocess.run([path, '-version'],
+                                      capture_output=True, text=True, timeout=10)
                 if result.returncode == 0:
                     self.ffmpeg_path = path
                     version_line = result.stdout.split('\n')[0]
@@ -92,9 +95,11 @@ class SimpleBrooklineDownloader:
                     return True
             except Exception as e:
                 continue
-        
+
         print("❌ FFmpeg not found! Install it with:")
-        print("   winget install ffmpeg")
+        print("   macOS: brew install ffmpeg")
+        print("   Windows: winget install ffmpeg")
+        print("   Linux: sudo apt install ffmpeg")
         print("   Then restart VS Code/Python")
         self.ffmpeg_path = None
         return False
@@ -593,6 +598,10 @@ class SimpleBrooklineDownloader:
         
         print(f"\n✅ Processed {processed_count} download folders")
 
+    def organize_downloaded_files(self):
+        """Backward-compatible wrapper for older manager workflow."""
+        self.process_downloaded_files()
+
     def convert_video(self, video_path, output_dir, folder_name):
         """Convert single video to 29.97fps and limit resolution to 1920x1080 (IMPROVED VERSION)"""
         try:
@@ -661,9 +670,10 @@ class SimpleBrooklineDownloader:
             
             print(f"🔧 Using FFmpeg: {self.ffmpeg_path}")
             print(f"🔧 Command: {' '.join(cmd[:3])} ... {cmd[-1]}")
-            
-            # Run with shell=True on Windows for better PATH handling
-            result = subprocess.run(cmd, capture_output=True, text=True, shell=True, timeout=600)
+
+            # Run FFmpeg conversion (shell=False for better security and cross-platform compatibility)
+            # Increased timeout to 30 minutes for large files
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=1800)
             
             if result.returncode == 0:
                 print(f"✅ Successfully converted: {output_filename}")

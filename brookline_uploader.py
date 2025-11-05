@@ -22,7 +22,7 @@ class BrooklineCablecastUploader:
         self.cablecast_url = "http://brookline-interactive-group.cablecast.tv:8080/CablecastUI/#/?location_id=1"
         
         # File paths - sync with downloader script
-        self.watch_path = Path("C:/govideosav")  # Same as downloader
+        self.watch_path = Path.home() / "govideosav"  # Same as downloader
         self.upload_log_file = self.watch_path / "uploaded_files.json"
         
         # Tracking
