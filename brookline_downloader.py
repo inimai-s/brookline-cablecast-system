@@ -1,6 +1,7 @@
 import os
 import time
 import re
+import platform
 from datetime import datetime, timedelta
 from pathlib import Path
 from selenium import webdriver
@@ -22,7 +23,8 @@ except ImportError:
 class SimpleBrooklineDownloader:
     def __init__(self):
         self.base_url = "https://www.brooklinema.gov/"
-        self.save_path = Path("C:/govideosav")
+        # Use the same directory as the script file
+        self.save_path = Path(__file__).parent / "govideosav"
         self.driver = None
         self.downloading_tabs = []  # Track tabs with downloads
         self.downloaded_events = set()  # Track downloaded event IDs
@@ -56,25 +58,56 @@ class SimpleBrooklineDownloader:
         self.check_and_find_ffmpeg()
 
     def check_and_find_ffmpeg(self):
-        """Find FFmpeg executable and test it"""
+        """Find FFmpeg executable and test it (cross-platform)"""
         print("🔍 Checking FFmpeg availability...")
+        
+        system = platform.system()
+        is_windows = system == "Windows"
+        is_macos = system == "Darwin"
+        is_linux = system == "Linux"
         
         # Try different ways to find ffmpeg
         possible_paths = [
-            "ffmpeg",  # In PATH
-            "ffmpeg.exe",  # In PATH with .exe
-            shutil.which("ffmpeg"),  # Use shutil.which
-            "C:\\ffmpeg\\bin\\ffmpeg.exe",  # Common installation path
+            "ffmpeg",  # In PATH (works on all platforms)
+            shutil.which("ffmpeg"),  # Use shutil.which (cross-platform)
         ]
         
-        # Add winget installation paths
-        import getpass
-        username = getpass.getuser()
-        winget_paths = [
-            f"C:\\Users\\{username}\\AppData\\Local\\Microsoft\\WinGet\\Packages\\Gyan.FFmpeg_Microsoft.Winget.Source_8wekyb3d8bbwe\\ffmpeg-7.1.1-full_build\\bin\\ffmpeg.exe",
-            f"C:\\Users\\{username}\\AppData\\Local\\Microsoft\\WinGet\\Links\\ffmpeg.exe"
-        ]
-        possible_paths.extend(winget_paths)
+        # Add .exe for Windows if on Windows
+        if is_windows:
+            possible_paths.extend([
+                "ffmpeg.exe",  # In PATH with .exe
+                "C:\\ffmpeg\\bin\\ffmpeg.exe",  # Common Windows installation path
+            ])
+            
+            # Add winget installation paths (Windows only)
+            import getpass
+            username = getpass.getuser()
+            winget_paths = [
+                f"C:\\Users\\{username}\\AppData\\Local\\Microsoft\\WinGet\\Packages\\Gyan.FFmpeg_Microsoft.Winget.Source_8wekyb3d8bbwe\\ffmpeg-7.1.1-full_build\\bin\\ffmpeg.exe",
+                f"C:\\Users\\{username}\\AppData\\Local\\Microsoft\\WinGet\\Links\\ffmpeg.exe"
+            ]
+            possible_paths.extend(winget_paths)
+        
+        # Add macOS Homebrew paths
+        if is_macos:
+            homebrew_paths = [
+                "/opt/homebrew/bin/ffmpeg",  # Apple Silicon Homebrew
+                "/usr/local/bin/ffmpeg",     # Intel Homebrew
+                "/opt/homebrew/opt/ffmpeg/bin/ffmpeg",  # Homebrew formula path
+            ]
+            possible_paths.extend(homebrew_paths)
+        
+        # Add Linux common paths
+        if is_linux:
+            linux_paths = [
+                "/usr/bin/ffmpeg",           # Standard system path
+                "/usr/local/bin/ffmpeg",     # User-installed
+                "/snap/bin/ffmpeg",          # Snap package
+            ]
+            possible_paths.extend(linux_paths)
+        
+        # Use shell=True on Windows, shell=False on Unix
+        use_shell = is_windows
         
         for path in possible_paths:
             if path is None:
@@ -83,7 +116,7 @@ class SimpleBrooklineDownloader:
             try:
                 # Test the ffmpeg path
                 result = subprocess.run([path, '-version'], 
-                                      capture_output=True, text=True, timeout=10, shell=True)
+                                      capture_output=True, text=True, timeout=10, shell=use_shell)
                 if result.returncode == 0:
                     self.ffmpeg_path = path
                     version_line = result.stdout.split('\n')[0]
@@ -93,9 +126,21 @@ class SimpleBrooklineDownloader:
             except Exception as e:
                 continue
         
+        # OS-specific installation instructions
         print("❌ FFmpeg not found! Install it with:")
-        print("   winget install ffmpeg")
-        print("   Then restart VS Code/Python")
+        if is_windows:
+            print("   Windows: winget install ffmpeg")
+            print("   Or download from: https://ffmpeg.org/download.html")
+        elif is_macos:
+            print("   macOS: brew install ffmpeg")
+        elif is_linux:
+            print("   Linux: sudo apt install ffmpeg")
+            print("   Or: sudo yum install ffmpeg")
+            print("   Or: sudo snap install ffmpeg")
+        else:
+            print("   Visit: https://ffmpeg.org/download.html")
+        print("   Then restart the script")
+        
         self.ffmpeg_path = None
         return False
 
@@ -662,8 +707,9 @@ class SimpleBrooklineDownloader:
             print(f"🔧 Using FFmpeg: {self.ffmpeg_path}")
             print(f"🔧 Command: {' '.join(cmd[:3])} ... {cmd[-1]}")
             
-            # Run with shell=True on Windows for better PATH handling
-            result = subprocess.run(cmd, capture_output=True, text=True, shell=True, timeout=600)
+            # Run with shell=True on Windows, shell=False on Unix
+            use_shell = platform.system() == "Windows"
+            result = subprocess.run(cmd, capture_output=True, text=True, shell=use_shell, timeout=600)
             
             if result.returncode == 0:
                 print(f"✅ Successfully converted: {output_filename}")
@@ -692,7 +738,7 @@ class SimpleBrooklineDownloader:
             return False
 
     def sanitize_filename(self, filename):
-        """Clean filename for Windows"""
+        """Clean filename by removing invalid characters (cross-platform)"""
         invalid_chars = '<>:"/\\|?*'
         for char in invalid_chars:
             filename = filename.replace(char, '_')

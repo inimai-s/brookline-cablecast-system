@@ -137,9 +137,9 @@ class BrooklineManager:
                 print("🔄 Cleaning up download tabs...")
                 downloader.cleanup_old_download_tabs()
                 
-                # Organize the downloaded file
-                print("📁 Organizing downloaded files...")
-                downloader.organize_downloaded_files()
+                # Process and organize the downloaded file
+                print("📁 Processing downloaded files...")
+                downloader.process_downloaded_files()
                 
                 print(f"✅ Download phase completed for Event #{downloaded_video['event_number']}")
                 
@@ -162,7 +162,7 @@ class BrooklineManager:
             print("🧪 SINGLE VIDEO TEST COMPLETED!")
             print(f"✅ Downloaded: Event #{downloaded_video['event_number']}")
             print(f"📋 Title: {downloaded_video['title'][:60]}...")
-            print(f"📁 Check C:/govideosav for organized files")
+            print(f"📁 Check {Path(__file__).parent / 'govideosav'} for organized files")
             print(f"📤 Upload attempted - check Cablecast for uploaded video")
             print(f"🕒 Test finished at: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
             print(f"{'='*80}")
@@ -325,8 +325,8 @@ class BrooklineManager:
         else:
             print("❌ Uploader class import failed")
         
-        # Check if C:/govideosav exists
-        watch_path = Path("C:/govideosav")
+        # Check if govideosav folder exists (in same directory as scripts)
+        watch_path = Path(__file__).parent / "govideosav"
         if watch_path.exists():
             week_folders = [f for f in watch_path.iterdir() if f.is_dir() and f.name.startswith("Week_")]
             print(f"✅ Watch folder exists with {len(week_folders)} week folders")
