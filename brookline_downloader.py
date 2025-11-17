@@ -457,14 +457,35 @@ class SimpleBrooklineDownloader:
             })
             
             print(f"📁 Changed download directory to: {download_folder}")
-            
+
+            # Wait for loading overlay to disappear
+            print("⏳ Waiting for page to finish loading...")
+            try:
+                from selenium.webdriver.support.ui import WebDriverWait
+                from selenium.webdriver.support import expected_conditions as EC
+                from selenium.common.exceptions import TimeoutException
+
+                # Wait for loading mask to disappear (max 15 seconds)
+                WebDriverWait(self.driver, 15).until(
+                    EC.invisibility_of_element_located((By.CSS_SELECTOR, ".zm-loading-mask"))
+                )
+                print("✓ Loading overlay cleared")
+            except TimeoutException:
+                print("⚠️ Loading overlay timeout - proceeding anyway")
+            except:
+                # If element doesn't exist, that's fine - page is loaded
+                pass
+
+            # Additional wait for download button to be ready
+            time.sleep(2)
+
             # Look for download button
             download_selectors = [
                 "#app header .header-right a",
                 ".download-btn",
                 "a[download]"
             ]
-            
+
             download_button = None
             for selector in download_selectors:
                 try:
@@ -472,11 +493,20 @@ class SimpleBrooklineDownloader:
                     break
                 except:
                     continue
-            
+
             if download_button:
-                # Click download
-                download_button.click()
-                print("✓ Download initiated!")
+                # Try to click with JavaScript as fallback if regular click fails
+                try:
+                    download_button.click()
+                    print("✓ Download initiated!")
+                except Exception as click_error:
+                    print(f"⚠️ Regular click failed, trying JavaScript click: {click_error}")
+                    try:
+                        self.driver.execute_script("arguments[0].click();", download_button)
+                        print("✓ Download initiated with JavaScript click!")
+                    except Exception as js_error:
+                        print(f"❌ JavaScript click also failed: {js_error}")
+                        raise
                 
                 # Track this tab for later cleanup
                 download_info = {
